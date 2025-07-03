@@ -10,7 +10,7 @@ firebase_key_path = "streamlit_dashboard/firebase_key.json"
 if os.path.exists(firebase_key_path) and not firebase_admin._apps:
     cred = credentials.Certificate(firebase_key_path)
     firebase_admin.initialize_app(cred, {
-        'databaseURL': 'https://patient-health-1cdb3-default-rtdb.firebaseio.com/'
+        'databaseURL': st.secrets["FIREBASE_DB_URL"]
     })
 
 # ---------- Push Data to Firebase ----------
