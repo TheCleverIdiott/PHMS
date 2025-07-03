@@ -116,7 +116,18 @@ import firebase_admin
 
 # ---------- Firebase Admin Setup ----------
 if not firebase_admin._apps:
-    cred = credentials.Certificate("service_account.json")  # Ensure this file exists in your project
+    cred = credentials.Certificate({
+    "type": st.secrets["FIREBASE_TYPE"],
+    "project_id": st.secrets["FIREBASE_PROJECT_ID"],
+    "private_key_id": st.secrets["FIREBASE_PRIVATE_KEY_ID"],
+    "private_key": st.secrets["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n"),
+    "client_email": st.secrets["FIREBASE_CLIENT_EMAIL"],
+    "client_id": st.secrets["FIREBASE_CLIENT_ID"],
+    "auth_uri": st.secrets["FIREBASE_AUTH_URI"],
+    "token_uri": st.secrets["FIREBASE_TOKEN_URI"],
+    "auth_provider_x509_cert_url": st.secrets["FIREBASE_AUTH_PROVIDER_X509_CERT_URL"],
+    "client_x509_cert_url": st.secrets["FIREBASE_CLIENT_X509_CERT_URL"]
+}) # Ensure this file exists in your project
     initialize_app(cred, {
         'databaseURL': st.secrets["FIREBASE_DB_URL"]
     })
