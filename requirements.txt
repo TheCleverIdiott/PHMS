@@ -1,0 +1,8 @@
+streamlit
+plotly
+pandas
+firebase-admin
+streamlit-autorefresh
+pyrebase4
+
+
