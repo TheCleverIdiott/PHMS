@@ -4,5 +4,7 @@ pandas
 firebase-admin
 streamlit-autorefresh
 pyrebase4
+streamlit-extras
+
 
 
