@@ -1,0 +1,37 @@
+# Streamlit & Python
+.streamlit/secrets.toml
+streamlit_dashboard/.streamlit/secrets.toml
+streamlit_dashboard/service_account.json
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+ENV/
+.venv/
+.Python
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# VS Code / IDE configs
+.vscode/
+.idea/
+
+# Jupyter/IPython
+.ipynb_checkpoints/
+
+# dotenv (if using)
+.env
+
+# Logs
+vitals_log.csv
+__pycache__/
+*.pyc
