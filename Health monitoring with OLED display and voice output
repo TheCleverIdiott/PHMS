@@ -1,0 +1,172 @@
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Wire.h>
+#include "MAX30100_PulseOximeter.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include "Bonezegei_DHT11.h"
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <SoftwareSerial.h>
+#include <DFRobotDFPlayerMini.h>
+
+#define DHT11_PIN 18
+#define DS18B20 5
+#define REPORTING_PERIOD_MS 1000
+
+float temperature, humidity, BPM, SpO2, bodytemperature;
+
+const char *ssid = "**********";
+const char *password = "**********";
+
+Bonezegei_DHT11 dhtSensor(DHT11_PIN);
+PulseOximeter pox;
+uint32_t tsLastReport = 0;
+OneWire oneWire(DS18B20);
+DallasTemperature sensors(&oneWire);
+WebServer server(80);
+
+// OLED settings
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// DFPlayer Mini using software serial
+SoftwareSerial mySoftwareSerial(16, 17); // RX, TX
+DFRobotDFPlayerMini myDFPlayer;
+
+void onBeatDetected() {
+  Serial.println("Beat detected!");
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(19, OUTPUT);
+  delay(100);
+
+  Serial.println("Connecting to ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected!");
+  Serial.print("Got IP: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", handle_OnConnect);
+  server.begin();
+  Serial.println("HTTP server started");
+
+  Serial.print("Initializing pulse oximeter...");
+  if (!pox.begin()) {
+    Serial.println("FAILED");
+    for (;;);
+  } else {
+    Serial.println("SUCCESS");
+    pox.setOnBeatDetectedCallback(onBeatDetected);
+  }
+  pox.setIRLedCurrent(MAX30100_LED_CURR_7_6MA);
+
+  // OLED Init
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    while (true);
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("Health Monitor Ready");
+  display.display();
+
+  // DFPlayer Mini Init
+  mySoftwareSerial.begin(9600);
+  if (!myDFPlayer.begin(mySoftwareSerial)) {
+    Serial.println(F("Unable to begin DFPlayer Mini"));
+    while (true);
+  }
+  myDFPlayer.volume(20);  // Volume: 0 to 30
+}
+
+void loop() {
+  server.handleClient();
+  pox.update();
+  sensors.requestTemperatures();
+
+  char dhtResult = dhtSensor.getData();
+  if (dhtResult == 1) {
+    temperature = dhtSensor.getTemperature();
+    humidity = dhtSensor.getHumidity();
+  } else {
+    Serial.println("Failed to read DHT sensor data!");
+  }
+
+  BPM = pox.getHeartRate();
+  SpO2 = pox.getSpO2();
+  bodytemperature = sensors.getTempCByIndex(0);
+
+  // Voice Alert
+  if (SpO2 < 92 || BPM > 120 || bodytemperature > 38.0) {
+    myDFPlayer.play(1);  // Play alert audio (001.mp3)
+    delay(5000);         // Prevent constant repeat
+  }
+
+  // OLED Display
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Health Monitor:");
+  display.print("Temp: "); display.print(temperature, 1); display.println(" C");
+  display.print("Hum : "); display.print(humidity, 1); display.println(" %");
+  display.print("BPM : "); display.println(BPM);
+  display.print("SpO2: "); display.print(SpO2); display.println(" %");
+  display.print("Body: "); display.print(bodytemperature, 1); display.println(" C");
+  display.display();
+
+  if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
+    Serial.print("Room Temperature: ");
+    Serial.print(temperature);
+    Serial.println("°C");
+
+    Serial.print("Room Humidity: ");
+    Serial.print(humidity);
+    Serial.println("%");
+
+    Serial.print("BPM: ");
+    Serial.println(BPM);
+
+    Serial.print("SpO2: ");
+    Serial.print(SpO2);
+    Serial.println("%");
+
+    Serial.print("Body Temperature: ");
+    Serial.print(bodytemperature);
+    Serial.println("°C");
+
+    Serial.println("*********************************");
+    Serial.println();
+
+    tsLastReport = millis();
+  }
+}
+
+void handle_OnConnect() {
+  server.send(200, "text/html", SendHTML(temperature, humidity, BPM, SpO2, bodytemperature));
+}
+
+String SendHTML(float temperature, float humidity, float BPM, float SpO2, float bodytemperature) {
+  String ptr = "<!DOCTYPE html><html><head><title>ESP32 Patient Health Monitoring</title><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+  ptr += "<style>body{text-align:center;font-family:sans-serif;}h1{margin:40px;}div{margin:20px;font-size:20px;}</style></head><body>";
+  ptr += "<h1>ESP32 Health Monitor</h1>";
+  ptr += "<div>Room Temperature: " + String(temperature, 1) + " °C</div>";
+  ptr += "<div>Room Humidity: " + String(humidity, 1) + " %</div>";
+  ptr += "<div>Heart Rate: " + String(BPM) + " BPM</div>";
+  ptr += "<div>SpO2: " + String(SpO2) + " %</div>";
+  ptr += "<div>Body Temperature: " + String(bodytemperature, 1) + " °C</div>";
+  ptr += "</body></html>";
+  return ptr;
+}
